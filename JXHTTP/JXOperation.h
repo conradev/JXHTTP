@@ -41,17 +41,6 @@
  */
 @property (assign, readonly) BOOL isFinished;
 
-/**
- Upon being set to `YES`, retrieves a `UIBackgroundTaskIdentifier` to allow the
- operation to continue running when the application enters the background.
- 
- Safe to access from any thread at any time.
- 
- @warning Changing this property to `YES` after the operation has started will
- have no effect. Changing it to `NO` will discontinue background execution.
- */
-@property (assign) BOOL continuesInAppBackground;
-
 /// @name Starting & Finishing
 
 /**

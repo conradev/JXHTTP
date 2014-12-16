@@ -23,8 +23,6 @@
 
 - (void)dealloc
 {
-    [self endAppBackgroundTask];
-    
     #if !OS_OBJECT_USE_OBJC
     dispatch_release(_stateQueue);
     _stateQueue = NULL;
@@ -39,7 +37,6 @@
 
         self.isExecuting = NO;
         self.isFinished = NO;
-        self.continuesInAppBackground = NO;
         
         #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_4_0
         self.backgroundTaskID = UIBackgroundTaskInvalid;
@@ -61,9 +58,6 @@
             [self willChangeValueForKey:@"isExecuting"];
             self.isExecuting = YES;
             [self didChangeValueForKey:@"isExecuting"];
-            
-            if (self.continuesInAppBackground)
-                [self startAppBackgroundTask];
         }
     });
     
@@ -91,7 +85,7 @@
 
 - (void)willFinish
 {
-    [self endAppBackgroundTask];
+
 }
 
 - (void)finish
@@ -121,51 +115,6 @@
     NSOperationQueue *tempQueue = [[NSOperationQueue alloc] init];
     [tempQueue addOperation:self];
     [tempQueue waitUntilAllOperationsAreFinished];
-}
-
-#pragma mark - Private Methods
-
-- (void)startAppBackgroundTask
-{
-    #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_4_0
-    
-    if (self.backgroundTaskID != UIBackgroundTaskInvalid || [self isCancelled])
-        return;
-    
-    __weak __typeof(self) weakSelf = self;
-    
-    dispatch_async(dispatch_get_main_queue(), ^{
-        __typeof(weakSelf) strongSelf = weakSelf;
-
-        if (!strongSelf || [strongSelf isCancelled] || strongSelf.isFinished)
-            return;
-
-        UIBackgroundTaskIdentifier taskID = UIBackgroundTaskInvalid;
-        taskID = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
-            [[UIApplication sharedApplication] endBackgroundTask:taskID];
-        }];
-
-        strongSelf.backgroundTaskID = taskID;
-    });
-
-    #endif
-}
-
-- (void)endAppBackgroundTask
-{
-    #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_4_0
-    
-    UIBackgroundTaskIdentifier taskID = self.backgroundTaskID;
-    if (taskID == UIBackgroundTaskInvalid)
-        return;
-    
-    self.backgroundTaskID = UIBackgroundTaskInvalid;
-    
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[UIApplication sharedApplication] endBackgroundTask:taskID];
-    });
-
-    #endif
 }
 
 @end

@@ -1,20 +1,13 @@
 #import "JXHTTPOperation.h"
 #import "JXURLEncoding.h"
 
-static NSUInteger JXHTTPOperationCount = 0;
-static NSTimer * JXHTTPActivityTimer = nil;
-static NSTimeInterval JXHTTPActivityTimerInterval = 0.25;
-
 @interface JXHTTPOperation ()
-@property (assign) BOOL didIncrementCount;
 @property (strong) NSURLAuthenticationChallenge *authenticationChallenge;
 @property (strong) NSNumber *downloadProgress;
 @property (strong) NSNumber *uploadProgress;
 @property (strong) NSString *uniqueString;
 @property (strong) NSDate *startDate;
 @property (strong) NSDate *finishDate;
-@property (assign) dispatch_once_t incrementCountOnce;
-@property (assign) dispatch_once_t decrementCountOnce;
 #if OS_OBJECT_USE_OBJC
 @property (strong) dispatch_queue_t blockQueue;
 #else
@@ -28,8 +21,6 @@ static NSTimeInterval JXHTTPActivityTimerInterval = 0.25;
 
 - (void)dealloc
 {
-    [self decrementOperationCount];
-
     #if !OS_OBJECT_USE_OBJC
     dispatch_release(_blockQueue);
     _blockQueue = NULL;
@@ -51,7 +42,6 @@ static NSTimeInterval JXHTTPActivityTimerInterval = 0.25;
         self.responseDataFilePath = nil;
         self.credential = nil;
         self.userObject = nil;
-        self.didIncrementCount = NO;
         self.useCredentialStorage = YES;
         self.trustedHosts = nil;
         self.trustAllHosts = NO;
@@ -162,72 +152,6 @@ static NSTimeInterval JXHTTPActivityTimerInterval = 0.25;
     return nil;
 }
 
-#pragma mark - Operation Count
-
-- (void)incrementOperationCount
-{
-    #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_2_0
-    
-    dispatch_once(&_incrementCountOnce, ^{
-        if (!self.updatesNetworkActivityIndicator)
-            return;
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            ++JXHTTPOperationCount;
-            [JXHTTPActivityTimer invalidate];
-            [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
-        });
-
-        self.didIncrementCount = YES;
-    });
-    
-    #endif
-}
-
-- (void)decrementOperationCount
-{
-    #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_2_0
-    
-    if (!self.didIncrementCount)
-        return;
-    
-    dispatch_once(&_decrementCountOnce, ^{
-        if (!self.updatesNetworkActivityIndicator)
-            return;
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (--JXHTTPOperationCount < 1)
-                [JXHTTPOperation restartActivityTimer];
-        });
-    });
-
-    #endif
-}
-
-+ (void)restartActivityTimer
-{
-    #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_2_0
-    
-    JXHTTPActivityTimer = [NSTimer timerWithTimeInterval:JXHTTPActivityTimerInterval
-                                                  target:self
-                                                selector:@selector(networkActivityTimerDidFire:)
-                                                userInfo:nil
-                                                 repeats:NO];
-    
-    [[NSRunLoop mainRunLoop] addTimer:JXHTTPActivityTimer forMode:NSRunLoopCommonModes];
-
-    #endif
-}
-
-+ (void)networkActivityTimerDidFire:(NSTimer *)timer
-{
-    #if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_2_0
-
-    [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
-    
-    #endif
-}
-
 #pragma mark - Accessors
 
 - (void)setResponseDataFilePath:(NSString *)filePath
@@ -260,8 +184,6 @@ static NSTimeInterval JXHTTPActivityTimerInterval = 0.25;
 
     [self performDelegateMethod:@selector(httpOperationWillStart:)];
 
-    [self incrementOperationCount];
-
     [self finalizeRequestBody];
 
     self.startDate = [[NSDate alloc] init];
@@ -274,8 +196,6 @@ static NSTimeInterval JXHTTPActivityTimerInterval = 0.25;
 - (void)willFinish
 {
     [super willFinish];
-
-    [self decrementOperationCount];
 }
 
 #pragma mark - <NSURLConnectionDelegate>
